@@ -65,9 +65,44 @@ def get_corners(binary_2d_array: np.ndarray, target_value=255) -> QuadrilateralC
     bottom_left_corner = None
     bottom_right_corner = None
 
+    # Get top-left corner
+    # Search diagonally
+    # / / /
+    # / /
+    # /
+    # col + row = k
+    # k: [0, cols - 1]
+    # row: [0, k]
+    for k in range(0, cols - 1 + 1, 1):
+        for row in range(0, k + 1, 1):
+            col = k - row
+            if row < 0 or col < 0 or row >= rows or col >= cols:
+                # Out of range
+                break
+
+            if binary_2d_array[row][col] == target_value:
+                top_left_corner = Point(col, row)  # (x, y) = (col, row)
+                # Break from inner loop
+                break
+        if top_left_corner is not None:
+            # Break from outer loop
+            break
+
     # Get top-right corner
-    for row in range(0, rows, 1):
-        for col in range(0, cols, 1):
+    # Search diagonally
+    # \ \ \
+    #   \ \
+    #     \
+    # row + k = col
+    # k: [cols - 1, 0]
+    # row [0, cols - k - 1]
+    for k in range(cols - 1, -1, -1):
+        for row in range(0, cols - k - 1 + 1, 1):
+            col = k + row
+            if row < 0 or col < 0 or row >= rows or col >= cols:
+                # Out of range
+                break
+
             if binary_2d_array[row][col] == target_value:
                 top_right_corner = Point(col, row)  # (x, y) = (col, row)
                 # Break from inner loop
@@ -77,8 +112,20 @@ def get_corners(binary_2d_array: np.ndarray, target_value=255) -> QuadrilateralC
             break
 
     # Get bottom-left corner
-    for row in range(rows - 1, -1, -1):
-        for col in range(cols - 1, -1, -1):
+    # Search diagonally
+    # \
+    # \ \
+    # \ \ \
+    # col + k = row
+    # k: [rows - 1, rows - cols]
+    # row [rows - 1, k]
+    for k in range(rows - 1, rows - cols - 1, -1):
+        for row in range(rows - 1, k - 1, -1):
+            col = -k + row
+            if row < 0 or col < 0 or row >= rows or col >= cols:
+                # Out of range
+                break
+
             if binary_2d_array[row][col] == target_value:
                 bottom_left_corner = Point(col, row)  # (x, y) = (col, row)
                 # Break from inner loop
@@ -87,20 +134,21 @@ def get_corners(binary_2d_array: np.ndarray, target_value=255) -> QuadrilateralC
             # Break from outer loop
             break
 
-    # Get top-left corner
-    for col in range(0, cols, 1):
-        for row in range(0, rows, 1):
-            if binary_2d_array[row][col] == target_value:
-                top_left_corner = Point(col, row)  # (x, y) = (col, row)
-                # Break from inner loop
-                break
-        if top_left_corner is not None:
-            # Break from outer loop
-            break
-
     # Get bottom-right corner
-    for col in range(cols - 1, -1, -1):
-        for row in range(rows - 1, -1, -1):
+    # Search diagonally
+    #     /
+    #   / /
+    # / / /
+    # col + row = k
+    # k: [rows + cols - 2, rows - 1]
+    # row: [rows - 1, k - cols + 1]
+    for k in range(rows + cols - 2, rows - 1 - 1, -1):
+        for row in range(rows - 1, k - cols + 1 - 1, -1):
+            col = k - row
+            if row < 0 or col < 0 or row >= rows or col >= cols:
+                # Out of range
+                break
+
             if binary_2d_array[row][col] == target_value:
                 bottom_right_corner = Point(col, row)  # (x, y) = (col, row)
                 # Break from inner loop

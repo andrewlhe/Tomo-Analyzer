@@ -1,6 +1,7 @@
 import cv2 as cv
 import numpy as np
 import os
+from sys import platform
 from typing import Union
 import utilities
 from utilities import DiagonalCorners, QuadrilateralCorners
@@ -102,7 +103,8 @@ def process_single_frame(input_directory_path, input_file_name):
 
 def main():
     input_directory_path = r"Y:\APS\2020-3_1IDC\tomo\32bit\sample_1\hassani_sam1_load0_tomo"
-    # input_directory_path = r"/Users/haoyuanxia/Desktop"
+    if platform == "darwin":
+        input_directory_path = r"/Users/haoyuanxia/Desktop"
     output_directory_path = r"Y:\APS\2021-3_1IDC\WAXS_fitting\mapping\He_1-1_m5\90deg"
 
     input_file_names = [f for f in os.listdir(input_directory_path) if (
