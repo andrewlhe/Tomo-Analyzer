@@ -30,7 +30,7 @@ def get_cropped(image: np.ndarray, crop_points: DiagonalCorners) -> np.ndarray:
     return result_image[crop_points.point1.y:crop_points.point2.y, crop_points.point1.x:crop_points.point2.x]
 
 
-def process_single_frame(input_directory_path, input_file_name):
+def process_single_frame(input_directory_path: str, input_file_name: str) -> None:
     input_file_path = os.path.join(input_directory_path, input_file_name)
 
     # Read image
@@ -101,7 +101,7 @@ def process_single_frame(input_directory_path, input_file_name):
     cv.waitKey(0)
 
 
-def main():
+def main() -> None:
     input_directory_path = r"Y:\APS\2020-3_1IDC\tomo\32bit\sample_1\hassani_sam1_load0_tomo"
     if platform == "darwin":
         input_directory_path = r"/Users/haoyuanxia/Desktop"
