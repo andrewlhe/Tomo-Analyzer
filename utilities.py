@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 
 
 class Point:
@@ -25,7 +25,7 @@ class DiagonalCorners:
     def __str__(self) -> str:
         return "Point 1: {}\nPoint 2: {}".format(self.point1, self.point2)
 
-    def get_list(self) -> list[Point]:
+    def get_list(self) -> List[Point]:
         return [self.point1, self.point2]
 
 
