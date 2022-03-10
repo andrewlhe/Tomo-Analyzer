@@ -2,7 +2,7 @@ import cv2 as cv
 import numpy as np
 import os
 from sys import platform
-from typing import Union
+from typing import Tuple, Union
 import utilities
 from utilities import DiagonalCorners, QuadrilateralCorners
 
@@ -10,7 +10,7 @@ from utilities import DiagonalCorners, QuadrilateralCorners
 DEBUG = True
 
 
-def get_corner_preview(image: np.ndarray, corners: QuadrilateralCorners, color: Union[int, tuple[int, int, int]], radius: int, thickness: int) -> np.ndarray:
+def get_corner_preview(image: np.ndarray, corners: QuadrilateralCorners, color: Union[int, Tuple[int, int, int]], radius: int, thickness: int) -> np.ndarray:
     result_image = np.array(image)
     for corner in corners.get_list():
         cv.circle(result_image, corner.get_tuple(),
@@ -18,7 +18,7 @@ def get_corner_preview(image: np.ndarray, corners: QuadrilateralCorners, color: 
     return result_image
 
 
-def get_crop_preview(image: np.ndarray, crop_points: DiagonalCorners, color: Union[int, tuple[int, int, int]], thickness: int) -> np.ndarray:
+def get_crop_preview(image: np.ndarray, crop_points: DiagonalCorners, color: Union[int, Tuple[int, int, int]], thickness: int) -> np.ndarray:
     result_image = np.array(image)
     cv.rectangle(result_image, crop_points.point1.get_tuple(),
                  crop_points.point2.get_tuple(), color, thickness=thickness)

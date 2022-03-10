@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Union
+from typing import Tuple, Union
 
 
 class Point:
@@ -13,7 +13,7 @@ class Point:
     def get_offset(self, x: Union[int, float], y: Union[int, float]) -> "Point":
         return Point(self.x + x, self.y + y)
 
-    def get_tuple(self) -> tuple[Union[int, float], Union[int, float]]:
+    def get_tuple(self) -> Tuple[Union[int, float], Union[int, float]]:
         return self.x, self.y
 
 
