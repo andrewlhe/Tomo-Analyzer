@@ -1,8 +1,11 @@
 import cv2 as cv
 import numpy as np
 import os
-from typing import Tuple, Union
+from typing import Union
 from utilities import Point, DiagonalCorners, QuadrilateralCorners
+
+
+DEBUG = True
 
 
 def get_normalized(array: np.ndarray, output_min=0.0, output_max=1.0) -> np.ndarray:
@@ -81,12 +84,7 @@ def get_crop_points_with_corners(corners: QuadrilateralCorners, mode: int) -> Di
     # Mode 0: cropped with circumscribed rectangle
     # Mode 1: cropped with inscribed rectangle
 
-    corner_list = [
-        corners.top_left,
-        corners.top_right,
-        corners.bottom_left,
-        corners.bottom_right
-    ]
+    corner_list = corners.get_list()
 
     from_point = Point()
     to_point = Point()
@@ -112,9 +110,18 @@ def get_crop_points_with_corners(corners: QuadrilateralCorners, mode: int) -> Di
     return DiagonalCorners(from_point, to_point)
 
 
-def get_crop_preview(image: np.ndarray, crop_points: DiagonalCorners, color: Union[int, Tuple[int, int, int]], thickness: int) -> np.ndarray:
+def get_corner_preview(image: np.ndarray, corners: QuadrilateralCorners, color: Union[int, tuple[int, int, int]], radius: int, thickness: int) -> np.ndarray:
     result_image = np.array(image)
-    cv.rectangle(result_image, crop_points.point1.get_tuple(), crop_points.point2.get_tuple(), color, thickness=thickness)
+    for corner in corners.get_list():
+        cv.circle(result_image, corner.get_tuple(),
+                  radius, color, thickness=thickness)
+    return result_image
+
+
+def get_crop_preview(image: np.ndarray, crop_points: DiagonalCorners, color: Union[int, tuple[int, int, int]], thickness: int) -> np.ndarray:
+    result_image = np.array(image)
+    cv.rectangle(result_image, crop_points.point1.get_tuple(),
+                 crop_points.point2.get_tuple(), color, thickness=thickness)
     return result_image
 
 
@@ -136,7 +143,8 @@ def process_single_frame(input_directory_path, input_file_name):
 
     # Convert from decimal to integer
     img_8_bit_int = np.round(img_normalized * 255).astype(np.uint8)
-    cv.imshow("8-bit Integer Image", img_8_bit_int)
+    if DEBUG:
+        cv.imshow("8-bit Integer Image", img_8_bit_int)
 
     # Reduce Image Noise
     # # Gaussian Blur
@@ -145,25 +153,30 @@ def process_single_frame(input_directory_path, input_file_name):
 
     # Bilateral
     img_8_bit_bilat = cv.bilateralFilter(img_8_bit_int, 5, 10, 10)
-    cv.imshow("Bilateral", img_8_bit_bilat)
-
-    cv.waitKey(0)
+    if DEBUG:
+        cv.imshow("Bilateral", img_8_bit_bilat)
 
     # Edge detection
     canny = cv.Canny(img_8_bit_bilat, 100, 200)
-    cv.imshow("Canny Edge Detection", canny)
+    if DEBUG:
+        cv.imshow("Canny Edge Detection", canny)
 
     # Find the four corners
     corners = get_corners(canny)
-    print(corners)
+    if DEBUG:
+        corner_preview = get_corner_preview(
+            img_8_bit_bilat, corners, color=0, radius=4, thickness=2)
+        cv.imshow("Corner Preview", corner_preview)
 
     # Crop
     crop_points = get_crop_points_with_corners(corners, mode=0)
-    crop_preview = get_crop_preview(
-        img_8_bit_bilat, crop_points, color=0, thickness=1)
-    cv.imshow("Crop Preview", crop_preview)
+    if DEBUG:
+        crop_preview = get_crop_preview(
+            corner_preview, crop_points, color=0, thickness=2)
+        cv.imshow("Crop Preview", crop_preview)
     img_cropped = get_cropped(img_8_bit_bilat, crop_points)
-    cv.imshow("Cropped", img_cropped)
+    if DEBUG:
+        cv.imshow("Cropped", img_cropped)
 
     # Find Pores
 
@@ -178,7 +191,8 @@ def process_single_frame(input_directory_path, input_file_name):
     center = np.uint8(center)
     res = center[label.flatten()]
     res2 = res.reshape(img_cropped.shape)
-    cv.imshow("Result", res2)
+    if DEBUG:
+        cv.imshow("Result", res2)
 
     # Find Matrix
 
