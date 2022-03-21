@@ -35,11 +35,13 @@ def process_single_frame(input_directory_path: str, input_file_name: str) -> Non
 
     # Read image
     img = cv.imread(input_file_path, flags=cv.IMREAD_ANYDEPTH)
-    # cv.imshow("Original Image", img)
+    if DEBUG:
+        cv.imshow("Original Image", img)
 
     # Normalization
     img_normalized = utilities.get_normalized(img)
-    # cv.imshow("Normalized Image", img_normalized)
+    if DEBUG:
+        cv.imshow("Normalized Image", img_normalized)
 
     # Convert from decimal to integer
     img_8_bit_int = np.round(img_normalized * 255).astype(np.uint8)
@@ -78,6 +80,8 @@ def process_single_frame(input_directory_path: str, input_file_name: str) -> Non
     if DEBUG:
         cv.imshow("Cropped", img_cropped)
 
+    # Rotate and Crop
+
     # Find Pores
 
     # References
@@ -98,14 +102,16 @@ def process_single_frame(input_directory_path: str, input_file_name: str) -> Non
 
     # Find Reinforcement
 
-    cv.waitKey(0)
+    # Pause for debug
+    if DEBUG:
+        cv.waitKey(0)
 
 
 def main() -> None:
     input_directory_path = r"Y:\APS\2020-3_1IDC\tomo\32bit\sample_1\hassani_sam1_load0_tomo"
     if platform == "darwin":
         input_directory_path = r"/Users/haoyuanxia/Desktop"
-    output_directory_path = r"Y:\APS\2021-3_1IDC\WAXS_fitting\mapping\He_1-1_m5\90deg"
+    output_directory_path = r"Y:\APS\2020-3_1IDC\tomo\result\sample_1"
 
     input_file_names = [f for f in os.listdir(input_directory_path) if (
         os.path.isfile(os.path.join(input_directory_path, f)) and f.endswith(".tiff"))]

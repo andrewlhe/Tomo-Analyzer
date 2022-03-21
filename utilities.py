@@ -39,7 +39,7 @@ class QuadrilateralCorners:
     def __str__(self) -> str:
         return "Top-left: {}\nTop-right: {}\nBottom-left: {}\nBottom-right: {}".format(self.top_left, self.top_right, self.bottom_left, self.bottom_right)
 
-    def get_list(self) -> list[Point]:
+    def get_list(self) -> List[Point]:
         return [self.top_left, self.top_right, self.bottom_left, self.bottom_right]
 
 
