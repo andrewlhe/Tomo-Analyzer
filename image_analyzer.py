@@ -4,30 +4,57 @@ import os
 from sys import platform
 from typing import Tuple, Union
 import utilities
-from utilities import DiagonalCorners, QuadrilateralCorners
+from utilities import DiagonalCorners, Quadrilateral
 
 
 DEBUG = True
 
 
-def get_corner_preview(image: np.ndarray, corners: QuadrilateralCorners, color: Union[int, Tuple[int, int, int]], radius: int, thickness: int) -> np.ndarray:
+def get_quadrilateral_preview(image: np.ndarray, quadrilateral: Quadrilateral, color: Union[int, Tuple[int, int, int]], corner_circle_radius: int, thickness: int) -> np.ndarray:
     result_image = np.array(image)
-    for corner in corners.get_list():
+
+    for corner in quadrilateral.get_corners().get_list():
         cv.circle(result_image, corner.get_tuple(),
-                  radius, color, thickness=thickness)
+                  corner_circle_radius, color, thickness=thickness)
+
+    for edge in quadrilateral.get_edges().get_list():
+        cv.line(result_image, edge.p1.get_tuple(),
+                edge.p2.get_tuple(), color, thickness=thickness)
+
+    return result_image
+
+
+def get_centroid_preview(image: np.ndarray, quadrilateral: Quadrilateral, color: Union[int, Tuple[int, int, int]], corner_circle_radius: int, thickness: int) -> np.ndarray:
+    result_image = np.array(image)
+
+    top_bottom_midline, left_right_midline = quadrilateral.get_midlines()
+    for midline in [top_bottom_midline, left_right_midline]:
+        cv.circle(result_image, midline.p1.get_rounded().get_tuple(),
+                  corner_circle_radius, color, thickness=thickness)
+        cv.circle(result_image, midline.p2.get_rounded().get_tuple(),
+                  corner_circle_radius, color, thickness=thickness)
+        cv.line(result_image, midline.p1.get_rounded().get_tuple(),
+                midline.p2.get_rounded().get_tuple(), color, thickness=thickness)
+
+    centroid = quadrilateral.get_centroid()
+    cv.circle(result_image, centroid.get_rounded().get_tuple(),
+              corner_circle_radius, color, thickness=thickness)
+
     return result_image
 
 
 def get_crop_preview(image: np.ndarray, crop_points: DiagonalCorners, color: Union[int, Tuple[int, int, int]], thickness: int) -> np.ndarray:
     result_image = np.array(image)
-    cv.rectangle(result_image, crop_points.point1.get_tuple(),
-                 crop_points.point2.get_tuple(), color, thickness=thickness)
+
+    cv.rectangle(result_image, crop_points.p1.get_tuple(),
+                 crop_points.p2.get_tuple(), color, thickness=thickness)
+
     return result_image
 
 
 def get_cropped(image: np.ndarray, crop_points: DiagonalCorners) -> np.ndarray:
     result_image = np.array(image)
-    return result_image[crop_points.point1.y:crop_points.point2.y, crop_points.point1.x:crop_points.point2.x]
+    return result_image[crop_points.p1.y:crop_points.p2.y, crop_points.p1.x:crop_points.p2.x]
 
 
 def process_single_frame(input_directory_path: str, input_file_name: str) -> None:
@@ -63,24 +90,34 @@ def process_single_frame(input_directory_path: str, input_file_name: str) -> Non
     if DEBUG:
         cv.imshow("Canny Edge Detection", canny)
 
-    # Find the four corners
-    corners = utilities.get_corners(canny)
+    # Find the quadrilateral
+    quadrilateral = utilities.get_quadrilateral(canny)
     if DEBUG:
-        corner_preview = get_corner_preview(
-            img_8_bit_bilat, corners, color=0, radius=4, thickness=2)
-        cv.imshow("Corner Preview", corner_preview)
+        quadrilateral_preview = get_quadrilateral_preview(
+            img_8_bit_bilat, quadrilateral, color=0, corner_circle_radius=4, thickness=2)
+        cv.imshow("Quadrilateral Preview", quadrilateral_preview)
+
+    # Find the centroid
+    centroid = quadrilateral.get_centroid()
+    if DEBUG:
+        centroid_preview = get_centroid_preview(
+            quadrilateral_preview, quadrilateral, color=0, corner_circle_radius=4, thickness=2)
+        cv.imshow("Centroid Preview", centroid_preview)
+    
+    # Find the rotation angle
+    rotation_angle = quadrilateral.get_rotation_angle()
+    if DEBUG:
+        print("Rotation angle: {} deg".format(rotation_angle))
 
     # Crop
-    crop_points = utilities.get_crop_points_with_corners(corners, mode=0)
+    crop_points = quadrilateral.get_crop_points(mode=0)
     if DEBUG:
         crop_preview = get_crop_preview(
-            corner_preview, crop_points, color=0, thickness=2)
+            quadrilateral_preview, crop_points, color=0, thickness=2)
         cv.imshow("Crop Preview", crop_preview)
     img_cropped = get_cropped(img_8_bit_bilat, crop_points)
     if DEBUG:
         cv.imshow("Cropped", img_cropped)
-
-    # Rotate and Crop
 
     # Find Pores
 
