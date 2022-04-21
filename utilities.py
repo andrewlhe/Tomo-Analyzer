@@ -86,6 +86,52 @@ class Point:
     def get_tuple(self) -> Tuple[Union[int, float], Union[int, float]]:
         return self.x, self.y
 
+    def get_distance_to_point(self, other: "Point") -> float:
+        """
+        Get the distance from this point to the specified point.
+
+        :param other: the specified point to get the distance.
+        :return: the distance.
+        """
+        return math.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
+
+    def get_angle_to_point(self, other: "Point") -> float:
+        """
+        Get the angle in degrees of the line segment from this point to the specified point in the Cartesian coordinate system.
+
+        :param other: the specified point to get the angle.
+        :return: the angle.
+        """
+        angle_rad = math.atan2(self.y - other.y, self.x - other.x)
+        return angle_rad / math.pi * 180
+
+    def rotate(self, center: "Point", angle: float) -> None:
+        """
+        Rotate this point in place with the specified center and angle. The angle is in degrees.
+
+        :param center: the specified center of rotation.
+        :param angle: the specified angle of rotation in degrees.
+        """
+        distance = self.get_distance_to_point(center)
+        current_angle_deg = self.get_angle_to_point(center)
+        new_angle_deg = current_angle_deg + angle
+        new_angle_rad = new_angle_deg / 180 * math.pi
+
+        self.x = center.x + math.cos(new_angle_rad) * distance
+        self.y = center.y + math.sin(new_angle_rad) * distance
+
+    def get_rotated(self, center: "Point", angle: float) -> "Point":
+        """
+        Get the rotated point with the specified center and angle. The angle is in degrees.
+
+        :param center: the specified center of rotation.
+        :param angle: the specified angle of rotation in degrees.
+        :return: the rotated point.
+        """
+        new_point = Point(self.x, self.y)
+        new_point.rotate(center, angle)
+        return new_point
+
 
 class Line:
     """
@@ -96,8 +142,8 @@ class Line:
         """
         Initialize a ``Line`` object with the two specified endpoints.
 
-        :param p1: one of the specified endpoints
-        :param p2: the other specified endpoint
+        :param p1: one of the specified endpoints.
+        :param p2: the other specified endpoint.
         """
         # p1 is always the smaller one to make intersected line segments calculation easier
         if p1 == p2:
@@ -153,21 +199,21 @@ class Line:
         """
         Get the midpoint of the line segment confined by the endpoints of this line.
 
-        :return: the midpoint of the line segment
+        :return: the midpoint of the line segment.
         """
         x = (self.p1.x + self.p2.x) / 2
         y = (self.p1.y + self.p2.y) / 2
         return Point(x, y)
 
-    def get_intersection_with_line(self, other_line: "Line") -> Optional[Point]:
+    def get_intersection_with_line(self, other: "Line") -> Optional[Point]:
         """
         Get the intersection point of this line with the specified line. If the two lines overlap, only the
         endpoint of the other line that lies on this line is considered as the intersection point.
 
-        :param other_line: the specified line to intersect with this line.
+        :param other: the specified line to intersect with this line.
         """
         (self_a, self_b, self_c) = self.get_parameters()
-        (other_a, other_b, other_c) = other_line.get_parameters()
+        (other_a, other_b, other_c) = other.get_parameters()
 
         determinant = self_a * other_b - other_a * self_b
 
@@ -182,15 +228,33 @@ class Line:
 
     def get_angle(self) -> float:
         """
-        Get the angle of this line with respect to a horizontal line. The value is in degree and the range is (-90, 90].
+        Get the angle of this line with respect to a horizontal line. The value is in degrees and the range is (-90, 90].
 
-        :return: the angle of this line
+        :return: the angle of this line.
         """
         (a, b, c) = self.get_parameters()
-        if b == 0:
-            return 90
-        else:
-            return math.atan(a / b) / math.pi * 180
+        angle_rad = math.atan2(a, b)
+        return angle_rad / math.pi * 180
+
+    def rotate(self, center: Point, angle: float) -> None:
+        """
+        Rotate this line in place with the specified center and angle. The angle is in degrees.
+
+        :param center: the specified center of rotation.
+        :param angle: the specified angle of rotation in degrees.
+        """
+        self.p1.rotate(center, angle)
+        self.p2.rotate(center, angle)
+
+    def get_rotated(self, center: Point, angle: float) -> "Line":
+        """
+        Get the rotated line with the specified center and angle. The angle is in degrees.
+
+        :param center: the specified center of rotation.
+        :param angle: the specified angle of rotation in degrees.
+        :return: the rotated line.
+        """
+        return Line(self.p1.get_rotated(center, angle), self.p2.get_rotated(center, angle))
 
 
 class DiagonalCorners:
@@ -268,7 +332,7 @@ class Quadrilateral:
     def get_centroid(self) -> Point:
         top_bottom_midline, left_right_midline = self.get_midlines()
         return top_bottom_midline.get_intersection_with_line(left_right_midline)
-    
+
     def get_rotation_angle(self) -> float:
         top_bottom_midline, left_right_midline = self.get_midlines()
 
@@ -278,9 +342,10 @@ class Quadrilateral:
         return (abs(top_bottom_midline_angle + left_right_midline_angle) - 90) / 2
 
     def get_crop_points(self, mode: int) -> DiagonalCorners:
-        # Mode 0: cropped with circumscribed rectangle
-        # Mode 1: cropped with inscribed rectangle
-
+        """
+        Mode 0: cropped with circumscribed rectangle
+        Mode 1: cropped with inscribed rectangle
+        """
         corner_list = self.corners.get_list()
 
         from_point = Point()
@@ -305,6 +370,31 @@ class Quadrilateral:
             to_point.y = corner_list[-2].y
 
         return DiagonalCorners(from_point, to_point)
+
+    def rotate(self, center: Point, angle: float) -> None:
+        """
+        Rotate this quadrilateral in place with the specified center and angle. The angle is in degrees.
+
+        :param center: the specified center of rotation.
+        :param angle: the specified angle of rotation in degrees.
+        """
+        self.corners.top_left.rotate(center, angle)
+        self.corners.top_right.rotate(center, angle)
+        self.corners.bottom_left.rotate(center, angle)
+        self.corners.bottom_right.rotate(center, angle)
+
+    def get_rotated(self, center: Point, angle: float) -> "Quadrilateral":
+        """
+        Get the rotated quadrilateral with the specified center and angle. The angle is in degrees.
+
+        :param center: the specified center of rotation.
+        :param angle: the specified angle of rotation in degrees.
+        :return: the rotated quadrilateral.
+        """
+        return Quadrilateral(QuadrilateralCorners(self.corners.top_left.get_rotated(center, angle),
+                                                  self.corners.top_right.get_rotated(center, angle),
+                                                  self.corners.bottom_left.get_rotated(center, angle),
+                                                  self.corners.bottom_right.get_rotated(center, angle)))
 
 
 def get_normalized(array: np.ndarray, output_min=0.0, output_max=1.0) -> np.ndarray:

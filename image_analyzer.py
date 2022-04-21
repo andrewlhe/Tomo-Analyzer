@@ -14,12 +14,12 @@ def get_quadrilateral_preview(image: np.ndarray, quadrilateral: Quadrilateral, c
     result_image = np.array(image)
 
     for corner in quadrilateral.get_corners().get_list():
-        cv.circle(result_image, corner.get_tuple(),
+        cv.circle(result_image, corner.get_rounded().get_tuple(),
                   corner_circle_radius, color, thickness=thickness)
 
     for edge in quadrilateral.get_edges().get_list():
-        cv.line(result_image, edge.p1.get_tuple(),
-                edge.p2.get_tuple(), color, thickness=thickness)
+        cv.line(result_image, edge.p1.get_rounded().get_tuple(),
+                edge.p2.get_rounded().get_tuple(), color, thickness=thickness)
 
     return result_image
 
@@ -48,15 +48,16 @@ def get_crop_preview(image: np.ndarray, crop_points: DiagonalCorners, color: Uni
                      thickness: int) -> np.ndarray:
     result_image = np.array(image)
 
-    cv.rectangle(result_image, crop_points.p1.get_tuple(),
-                 crop_points.p2.get_tuple(), color, thickness=thickness)
+    cv.rectangle(result_image, crop_points.p1.get_rounded().get_tuple(),
+                 crop_points.p2.get_rounded().get_tuple(), color, thickness=thickness)
 
     return result_image
 
 
 def get_cropped(image: np.ndarray, crop_points: DiagonalCorners) -> np.ndarray:
     result_image = np.array(image)
-    return result_image[crop_points.p1.y:crop_points.p2.y, crop_points.p1.x:crop_points.p2.x]
+    return result_image[crop_points.p1.get_rounded().y:crop_points.p2.get_rounded().y,
+           crop_points.p1.get_rounded().x:crop_points.p2.get_rounded().x]
 
 
 def process_single_frame(input_directory_path: str, input_file_name: str) -> None:
@@ -96,14 +97,14 @@ def process_single_frame(input_directory_path: str, input_file_name: str) -> Non
     quadrilateral = utilities.get_quadrilateral(canny)
     if DEBUG:
         quadrilateral_preview = get_quadrilateral_preview(
-            img_8_bit_bilat, quadrilateral, color=0, corner_circle_radius=4, thickness=2)
+            img_8_bit_bilat, quadrilateral, color=64, corner_circle_radius=4, thickness=2)
         cv.imshow("Quadrilateral Preview", quadrilateral_preview)
 
     # Find the centroid
     centroid = quadrilateral.get_centroid()
     if DEBUG:
         centroid_preview = get_centroid_preview(
-            quadrilateral_preview, quadrilateral, color=0, corner_circle_radius=4, thickness=2)
+            quadrilateral_preview, quadrilateral, color=64, corner_circle_radius=4, thickness=2)
         cv.imshow("Centroid Preview", centroid_preview)
 
     # Find the rotation angle
@@ -121,13 +122,22 @@ def process_single_frame(input_directory_path: str, input_file_name: str) -> Non
         cv.imshow("Rotated Image", rotated_image)
         cv.imshow("Rotated Image with Visualization", rotated_image_with_visualization)
 
+    # Find the quadrilateral after rotation
+    # In the coordinate of the image, the x-axis points to the right and the y-axis points to the bottom. The rotation
+    # angle needs to be the inverse to get the correct result.
+    rotated_quadrilateral = quadrilateral.get_rotated(centroid, -rotation_angle)
+    if DEBUG:
+        rotated_quadrilateral_preview = get_quadrilateral_preview(
+            rotated_image, rotated_quadrilateral, color=64, corner_circle_radius=4, thickness=2)
+        cv.imshow("Rotated Quadrilateral Preview", rotated_quadrilateral_preview)
+
     # Crop
-    crop_points = quadrilateral.get_crop_points(mode=0)
+    crop_points = rotated_quadrilateral.get_crop_points(mode=1)
     if DEBUG:
         crop_preview = get_crop_preview(
-            quadrilateral_preview, crop_points, color=0, thickness=2)
+            rotated_quadrilateral_preview, crop_points, color=0, thickness=2)
         cv.imshow("Crop Preview", crop_preview)
-    img_cropped = get_cropped(img_8_bit_bilat, crop_points)
+    img_cropped = get_cropped(rotated_image, crop_points)
     if DEBUG:
         cv.imshow("Cropped", img_cropped)
 
