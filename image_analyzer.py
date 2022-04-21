@@ -6,7 +6,8 @@ from typing import Tuple, Union
 import utilities
 from utilities import DiagonalCorners, Quadrilateral
 
-DEBUG = True
+
+DEBUG = False
 
 
 def get_quadrilateral_preview(image: np.ndarray, quadrilateral: Quadrilateral, color: Union[int, Tuple[int, int, int]],
@@ -58,6 +59,26 @@ def get_cropped(image: np.ndarray, crop_points: DiagonalCorners) -> np.ndarray:
     result_image = np.array(image)
     return result_image[crop_points.p1.get_rounded().y:crop_points.p2.get_rounded().y,
            crop_points.p1.get_rounded().x:crop_points.p2.get_rounded().x]
+
+
+def get_offset(image: np.ndarray, top: int, bottom: int, left: int, right: int) -> np.ndarray:
+    result_image = np.array(image)
+
+    image_height, image_width = result_image.shape[:2]
+    if top + bottom >= image_height or left + right >= image_width:
+        raise ValueError("Invalid offset value(s)")
+
+    return result_image[top:image_height - bottom, left:image_width - right]
+
+
+def get_threshold_for_binary_image(image: np.ndarray) -> int:
+    # Binary image: an image with only two colors
+    return image.min() + (image.max() - image.min()) // 2
+
+
+def get_proportion_for_binary_array(array: np.ndarray) -> float:
+    # Binary array: an array with only 0 or 1
+    return np.sum(array) / np.size(array)
 
 
 def process_single_frame(input_directory_path: str, input_file_name: str) -> None:
@@ -116,10 +137,11 @@ def process_single_frame(input_directory_path: str, input_file_name: str) -> Non
     image_height, image_width = img_8_bit_bilat.shape[:2]
     rotation_matrix = cv.getRotationMatrix2D(center=centroid.get_tuple(), angle=rotation_angle, scale=1)
     rotated_image = cv.warpAffine(src=img_8_bit_bilat, M=rotation_matrix, dsize=(image_width, image_height))
-    rotated_image_with_visualization = cv.warpAffine(src=centroid_preview, M=rotation_matrix,
-                                                     dsize=(image_width, image_height))
     if DEBUG:
         cv.imshow("Rotated Image", rotated_image)
+
+        rotated_image_with_visualization = cv.warpAffine(src=centroid_preview, M=rotation_matrix,
+                                                         dsize=(image_width, image_height))
         cv.imshow("Rotated Image with Visualization", rotated_image_with_visualization)
 
     # Find the quadrilateral after rotation
@@ -137,33 +159,54 @@ def process_single_frame(input_directory_path: str, input_file_name: str) -> Non
         crop_preview = get_crop_preview(
             rotated_quadrilateral_preview, crop_points, color=0, thickness=2)
         cv.imshow("Crop Preview", crop_preview)
-    img_cropped = get_cropped(rotated_image, crop_points)
+    image_cropped = get_cropped(rotated_image, crop_points)
+    image_cropped = get_offset(image_cropped, 15, 15, 15, 15)
     if DEBUG:
-        cv.imshow("Cropped", img_cropped)
+        cv.imshow("Cropped", image_cropped)
 
-    # Find Pores
+    # Segmentation
 
+    # Find pores
+    _, threshold_image = cv.threshold(image_cropped, 128, 255, cv.THRESH_BINARY_INV)
+    if DEBUG:
+        cv.imshow("Pores Image", threshold_image)
+
+    # Find reinforcement
     # References
     # https://docs.opencv.org/4.x/d1/d5c/tutorial_py_kmeans_opencv.html
     criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 100, 1.0)
     k = 2
-    z = img_cropped.reshape((-1, 1))
+    z = image_cropped.reshape((-1, 1))
     z = np.float32(z)
     ret, label, center = cv.kmeans(
         z, k, None, criteria, 100, cv.KMEANS_RANDOM_CENTERS)
     center = np.uint8(center)
     res = center[label.flatten()]
-    res2 = res.reshape(img_cropped.shape)
+    res2 = res.reshape(image_cropped.shape)
     if DEBUG:
         cv.imshow("Result", res2)
-
-    # Find Matrix
-
-    # Find Reinforcement
 
     # Pause for debug
     if DEBUG:
         cv.waitKey(0)
+
+    reinforcement_threshold = get_threshold_for_binary_image(res2)
+
+    array_pores = np.where(threshold_image > 128, 1, 0)
+    array_reinforcement = np.where(res2 <= reinforcement_threshold, 1, 0)
+    array_matrix = np.where(res2 > reinforcement_threshold, 1, 0)
+
+    # Subtract pores
+    array_reinforcement = np.bitwise_and(np.bitwise_not(array_pores), array_reinforcement)
+    array_matrix = np.bitwise_and(np.bitwise_not(array_pores), array_matrix)
+
+    np.savetxt(os.path.join(input_directory_path, "array_pores.csv"), array_pores, fmt="%d", delimiter=",")
+    np.savetxt(os.path.join(input_directory_path, "array_reinforcement.csv"), array_reinforcement, fmt="%d",
+               delimiter=",")
+    np.savetxt(os.path.join(input_directory_path, "array_matrix.csv"), array_matrix, fmt="%d", delimiter=",")
+    print("Pores:         {:.6f}".format(get_proportion_for_binary_array(array_pores)))
+    print("Reinforcement: {:.6f}".format(get_proportion_for_binary_array(array_reinforcement)))
+    print("Matrix:        {:.6f}".format(get_proportion_for_binary_array(array_matrix)))
 
 
 def main() -> None:
