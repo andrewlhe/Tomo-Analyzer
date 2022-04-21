@@ -1,10 +1,12 @@
 import cv2 as cv
+from cv2 import threshold
 import numpy as np
 import os
 from sys import platform
 from typing import Tuple, Union
 import utilities
-from utilities import DiagonalCorners, Quadrilateral
+from utilities import DiagonalCorners, Point, Quadrilateral
+
 
 INPUT_DIRECTORY_PATH = r"Y:\APS\2020-3_1IDC\tomo\32bit\sample_1\hassani_sam1_load0_tomo"
 OUTPUT_DIRECTORY_PATH = r"Y:\APS\2020-3_1IDC\tomo\result\sample_1"
@@ -60,13 +62,13 @@ def get_crop_preview(image: np.ndarray, crop_points: DiagonalCorners, color: Uni
     return result_image
 
 
-def get_cropped(image: np.ndarray, crop_points: DiagonalCorners) -> np.ndarray:
+def get_cropped_with_points(image: np.ndarray, crop_points: DiagonalCorners) -> np.ndarray:
     result_image = np.array(image)
     return result_image[crop_points.p1.get_rounded().y:crop_points.p2.get_rounded().y,
                         crop_points.p1.get_rounded().x:crop_points.p2.get_rounded().x]
 
 
-def get_offset(image: np.ndarray, top: int, bottom: int, left: int, right: int) -> np.ndarray:
+def get_cropped_with_offset(image: np.ndarray, top: int, bottom: int, left: int, right: int) -> np.ndarray:
     result_image = np.array(image)
 
     image_height, image_width = result_image.shape[:2]
@@ -76,44 +78,63 @@ def get_offset(image: np.ndarray, top: int, bottom: int, left: int, right: int) 
     return result_image[top:image_height - bottom, left:image_width - right]
 
 
+def get_padded(image: np.ndarray, top: int, bottom: int, left: int, right: int,
+               color: Union[int, Tuple[int, int, int]]) -> np.ndarray:
+    result_image = cv.copyMakeBorder(
+        image, top, bottom, left, right, cv.BORDER_CONSTANT, value=color)
+    return result_image
+
+
+def get_rotated(image: np.ndarray, center: Point, angle: float) -> np.ndarray:
+    image_height, image_width = image.shape[:2]
+    rotation_matrix = cv.getRotationMatrix2D(
+        center=center.get_tuple(), angle=angle, scale=1)
+    rotated_image = cv.warpAffine(
+        src=image, M=rotation_matrix, dsize=(image_width, image_height))
+    return rotated_image
+
+
 def get_threshold_for_binary_image(image: np.ndarray) -> int:
     # Binary image: an image with only two colors
     return image.min() + (image.max() - image.min()) // 2
 
 
-def get_proportion_for_binary_array(array: np.ndarray) -> float:
-    # Binary array: an array with only 0 or 1
-    return np.sum(array) / np.size(array)
+def get_proportion_for_binary_image(image: np.ndarray) -> float:
+    # Binary image: an image with only two colors
+    threshold = get_threshold_for_binary_image(image)
+    binary_array = np.where(image > threshold, 1, 0)
+    return np.sum(binary_array) / np.size(binary_array)
 
 
-def process_single_frame(input_file_path: str, output_directory_path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def process_single_frame(input_file_path: str, output_directory_path: str) -> Tuple[
+        np.ndarray, np.ndarray, np.ndarray, float, float, float]:
     # Read image
-    img = cv.imread(input_file_path, flags=cv.IMREAD_ANYDEPTH)
+    image = cv.imread(input_file_path, flags=cv.IMREAD_ANYDEPTH)
     if DEBUG:
-        cv.imshow("Original Image", img)
+        cv.imshow("Original Image", image)
 
     # Normalization
-    img_normalized = utilities.get_normalized(img)
+    image_normalized = utilities.get_normalized(image)
     if DEBUG:
-        cv.imshow("Normalized Image", img_normalized)
+        cv.imshow("Normalized Image", image_normalized)
 
     # Convert from decimal to integer
-    img_8_bit_int = np.round(img_normalized * 255).astype(np.uint8)
+    image_8_bit_int = np.round(image_normalized * 255).astype(np.uint8)
     if DEBUG:
-        cv.imshow("8-bit Integer Image", img_8_bit_int)
+        cv.imshow("8-bit Integer Image", image_8_bit_int)
 
     # Reduce Image Noise
     # # Gaussian Blur
-    # img_8_bit_avg = cv.GaussianBlur(img_8_bit_int, (5,5), 0)
-    # cv.imshow("Gaussian Blur", img_8_bit_avg)
+    # image_8_bit_avg = cv.GaussianBlur(image_8_bit_int, (5,5), 0)
+    # cv.imshow("Gaussian Blur", image_8_bit_avg)
 
     # Bilateral
-    img_8_bit_bilat = cv.bilateralFilter(img_8_bit_int, 5, 10, 10)
+    image_8_bit_bilat = cv.bilateralFilter(image_8_bit_int, 5, 10, 10)
     if DEBUG:
-        cv.imshow("Bilateral", img_8_bit_bilat)
+        cv.imshow("Bilateral", image_8_bit_bilat)
 
     # Edge detection
-    canny = cv.Canny(img_8_bit_bilat, 100, 200)
+    canny = cv.Canny(image_8_bit_bilat, 100, 200)
     if DEBUG:
         cv.imshow("Canny Edge Detection", canny)
 
@@ -121,7 +142,7 @@ def process_single_frame(input_file_path: str, output_directory_path: str) -> Tu
     quadrilateral = utilities.get_quadrilateral(canny)
     if DEBUG:
         quadrilateral_preview = get_quadrilateral_preview(
-            img_8_bit_bilat, quadrilateral, color=64, corner_circle_radius=4, thickness=2)
+            image_8_bit_bilat, quadrilateral, color=64, corner_circle_radius=4, thickness=2)
         cv.imshow("Quadrilateral Preview", quadrilateral_preview)
 
     # Find the centroid
@@ -137,16 +158,12 @@ def process_single_frame(input_file_path: str, output_directory_path: str) -> Tu
         print("Rotation angle: {} deg".format(rotation_angle))
 
     # Rotate
-    image_height, image_width = img_8_bit_bilat.shape[:2]
-    rotation_matrix = cv.getRotationMatrix2D(
-        center=centroid.get_tuple(), angle=rotation_angle, scale=1)
-    rotated_image = cv.warpAffine(
-        src=img_8_bit_bilat, M=rotation_matrix, dsize=(image_width, image_height))
+    rotated_image = get_rotated(image_8_bit_bilat, centroid, rotation_angle)
     if DEBUG:
         cv.imshow("Rotated Image", rotated_image)
 
-        rotated_image_with_visualization = cv.warpAffine(src=centroid_preview, M=rotation_matrix,
-                                                         dsize=(image_width, image_height))
+        rotated_image_with_visualization = get_rotated(
+            centroid_preview, centroid, rotation_angle)
         cv.imshow("Rotated Image with Visualization",
                   rotated_image_with_visualization)
 
@@ -167,18 +184,21 @@ def process_single_frame(input_file_path: str, output_directory_path: str) -> Tu
         crop_preview = get_crop_preview(
             rotated_quadrilateral_preview, crop_points, color=0, thickness=2)
         cv.imshow("Crop Preview", crop_preview)
-    image_cropped = get_cropped(rotated_image, crop_points)
-    image_cropped = get_offset(image_cropped, 15, 15, 15, 15)
+    image_cropped = get_cropped_with_points(rotated_image, crop_points)
+
+    crop_offset = 15
+    image_cropped = get_cropped_with_offset(
+        image_cropped, crop_offset, crop_offset, crop_offset, crop_offset)
     if DEBUG:
         cv.imshow("Cropped", image_cropped)
 
     # Segmentation
 
     # Find pores
-    _, threshold_image = cv.threshold(
+    _, image_pores = cv.threshold(
         image_cropped, 128, 255, cv.THRESH_BINARY_INV)
     if DEBUG:
-        cv.imshow("Pores Image", threshold_image)
+        cv.imshow("Pores", image_pores)
 
     # Find reinforcement
     # References
@@ -193,22 +213,75 @@ def process_single_frame(input_file_path: str, output_directory_path: str) -> Tu
     res = center[label.flatten()]
     res2 = res.reshape(image_cropped.shape)
     if DEBUG:
-        cv.imshow("Result", res2)
+        cv.imshow("Reinforcement and Matrix", res2)
+
+    reinforcement_threshold = get_threshold_for_binary_image(res2)
+    _, image_reinforcement_with_pores = cv.threshold(
+        res2, reinforcement_threshold, 255, cv.THRESH_BINARY_INV)
+    _, image_matrix_with_pores = cv.threshold(
+        res2, reinforcement_threshold, 255, cv.THRESH_BINARY)
+    if DEBUG:
+        cv.imshow("Reinforcement with Pores", image_reinforcement_with_pores)
+        cv.imshow("Matrix with Pores", image_matrix_with_pores)
+
+    # Subtract pores
+    image_reinforcement = np.bitwise_and(
+        np.bitwise_not(image_pores), image_reinforcement_with_pores)
+    image_matrix = np.bitwise_and(np.bitwise_not(
+        image_pores), image_matrix_with_pores)
+    if DEBUG:
+        cv.imshow("Reinforcement", image_reinforcement)
+        cv.imshow("Matrix", image_matrix)
+
+    # Calculate the proportion of each part
+    proportion_pores = get_proportion_for_binary_image(image_pores)
+    proportion_reinforcement = get_proportion_for_binary_image(
+        image_reinforcement)
+    proportion_matrix = get_proportion_for_binary_image(image_matrix)
+    if DEBUG:
+        print("Pores:         {:.6f}".format(proportion_pores))
+        print("Reinforcement: {:.6f}".format(proportion_reinforcement))
+        print("Matrix:        {:.6f}".format(proportion_matrix))
+
+    # Reverse the transformations
+
+    # Reverse the cropping
+    original_image_height, original_image_width = image_8_bit_bilat.shape[:2]
+    top_crop_amount = crop_points.p1.get_rounded().y + crop_offset
+    bottom_crop_amount = original_image_height - \
+        crop_points.p2.get_rounded().y + crop_offset
+    left_crop_amount = crop_points.p1.get_rounded().x + crop_offset
+    right_crop_amount = original_image_width - \
+        crop_points.p2.get_rounded().x + crop_offset
+
+    image_pores_padded = get_padded(
+        image_pores, top_crop_amount, bottom_crop_amount, left_crop_amount, right_crop_amount, color=0)
+    image_reinforcement_padded = get_padded(
+        image_reinforcement, top_crop_amount, bottom_crop_amount, left_crop_amount, right_crop_amount, color=0)
+    image_matrix_padded = get_padded(
+        image_matrix, top_crop_amount, bottom_crop_amount, left_crop_amount, right_crop_amount, color=0)
+
+    # Reverse the rotation
+    image_pores_rotated = get_rotated(
+        image_pores_padded, centroid, -rotation_angle)
+    image_reinforcement_rotated = get_rotated(
+        image_reinforcement_padded, centroid, -rotation_angle)
+    image_matrix_rotated = get_rotated(
+        image_matrix_padded, centroid, -rotation_angle)
+
+    if DEBUG:
+        cv.imshow("Pores (Original Position)", image_pores_rotated)
+        cv.imshow("Reinforcement (Original Position)",
+                  image_reinforcement_rotated)
+        cv.imshow("Matrix (Original Position)", image_matrix_rotated)
 
     # Pause for debug
     if DEBUG:
         cv.waitKey(0)
 
-    reinforcement_threshold = get_threshold_for_binary_image(res2)
-
-    array_pores = np.where(threshold_image > 128, 1, 0)
-    array_reinforcement = np.where(res2 <= reinforcement_threshold, 1, 0)
-    array_matrix = np.where(res2 > reinforcement_threshold, 1, 0)
-
-    # Subtract pores
-    array_reinforcement = np.bitwise_and(
-        np.bitwise_not(array_pores), array_reinforcement)
-    array_matrix = np.bitwise_and(np.bitwise_not(array_pores), array_matrix)
+    array_pores = np.where(image_pores_rotated > 128, 1, 0)
+    array_reinforcement = np.where(image_reinforcement_rotated > 128, 1, 0)
+    array_matrix = np.where(image_matrix_rotated > 128, 1, 0)
 
     _, file_base_name, _ = get_file_path_components(input_file_path)
 
@@ -219,15 +292,8 @@ def process_single_frame(input_file_path: str, output_directory_path: str) -> Tu
                delimiter=",")
     np.savetxt(os.path.join(output_directory_path, "{}_matrix.csv".format(file_base_name)), array_matrix, fmt="%d",
                delimiter=",")
-    if DEBUG:
-        print("Pores:         {:.6f}".format(
-            get_proportion_for_binary_array(array_pores)))
-        print("Reinforcement: {:.6f}".format(
-            get_proportion_for_binary_array(array_reinforcement)))
-        print("Matrix:        {:.6f}".format(
-            get_proportion_for_binary_array(array_matrix)))
-    
-    return array_pores, array_reinforcement, array_matrix
+
+    return array_pores, array_reinforcement, array_matrix, proportion_pores, proportion_reinforcement, proportion_matrix
 
 
 def get_file_path_components(file_path: str) -> Tuple[str, str, str]:
@@ -252,17 +318,24 @@ def main() -> None:
     pores_3d = []
     reinforcement_3d = []
     matrix_3d = []
+    proportion_pores_list = []
+    proportion_reinforcement_list = []
+    proportion_matrix_list = []
 
     for index, input_file_name in enumerate(input_file_names):
         input_file_path = os.path.join(input_directory_path, input_file_name)
-        array_pores, array_reinforcement, array_matrix = process_single_frame(input_file_path, output_directory_path)
+        array_pores, array_reinforcement, array_matrix, proportion_pores, proportion_reinforcement, proportion_matrix = process_single_frame(
+            input_file_path, output_directory_path)
 
         pores_3d.append(array_pores)
         reinforcement_3d.append(array_reinforcement)
         matrix_3d.append(array_matrix)
+        proportion_pores_list.append(proportion_pores)
+        proportion_reinforcement_list.append(proportion_reinforcement)
+        proportion_matrix_list.append(proportion_matrix)
 
         print("{} ({}/{})".format(input_file_name,
-              index + 1, len(input_file_names)))
+                                  index + 1, len(input_file_names)))
 
 
 if __name__ == "__main__":
