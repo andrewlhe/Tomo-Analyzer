@@ -6,6 +6,11 @@ from typing import Tuple, Union
 import utilities
 from utilities import DiagonalCorners, Quadrilateral
 
+INPUT_DIRECTORY_PATH = r"Y:\APS\2020-3_1IDC\tomo\32bit\sample_1\hassani_sam1_load0_tomo"
+OUTPUT_DIRECTORY_PATH = r"Y:\APS\2020-3_1IDC\tomo\result\sample_1"
+if platform == "darwin":
+    INPUT_DIRECTORY_PATH = r"/Users/haoyuanxia/Desktop/Input"
+    OUTPUT_DIRECTORY_PATH = r"/Users/haoyuanxia/Desktop/Output"
 
 DEBUG = False
 
@@ -58,7 +63,7 @@ def get_crop_preview(image: np.ndarray, crop_points: DiagonalCorners, color: Uni
 def get_cropped(image: np.ndarray, crop_points: DiagonalCorners) -> np.ndarray:
     result_image = np.array(image)
     return result_image[crop_points.p1.get_rounded().y:crop_points.p2.get_rounded().y,
-           crop_points.p1.get_rounded().x:crop_points.p2.get_rounded().x]
+                        crop_points.p1.get_rounded().x:crop_points.p2.get_rounded().x]
 
 
 def get_offset(image: np.ndarray, top: int, bottom: int, left: int, right: int) -> np.ndarray:
@@ -81,9 +86,7 @@ def get_proportion_for_binary_array(array: np.ndarray) -> float:
     return np.sum(array) / np.size(array)
 
 
-def process_single_frame(input_directory_path: str, input_file_name: str) -> None:
-    input_file_path = os.path.join(input_directory_path, input_file_name)
-
+def process_single_frame(input_file_path: str, output_directory_path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     # Read image
     img = cv.imread(input_file_path, flags=cv.IMREAD_ANYDEPTH)
     if DEBUG:
@@ -135,23 +138,28 @@ def process_single_frame(input_directory_path: str, input_file_name: str) -> Non
 
     # Rotate
     image_height, image_width = img_8_bit_bilat.shape[:2]
-    rotation_matrix = cv.getRotationMatrix2D(center=centroid.get_tuple(), angle=rotation_angle, scale=1)
-    rotated_image = cv.warpAffine(src=img_8_bit_bilat, M=rotation_matrix, dsize=(image_width, image_height))
+    rotation_matrix = cv.getRotationMatrix2D(
+        center=centroid.get_tuple(), angle=rotation_angle, scale=1)
+    rotated_image = cv.warpAffine(
+        src=img_8_bit_bilat, M=rotation_matrix, dsize=(image_width, image_height))
     if DEBUG:
         cv.imshow("Rotated Image", rotated_image)
 
         rotated_image_with_visualization = cv.warpAffine(src=centroid_preview, M=rotation_matrix,
                                                          dsize=(image_width, image_height))
-        cv.imshow("Rotated Image with Visualization", rotated_image_with_visualization)
+        cv.imshow("Rotated Image with Visualization",
+                  rotated_image_with_visualization)
 
     # Find the quadrilateral after rotation
     # In the coordinate of the image, the x-axis points to the right and the y-axis points to the bottom. The rotation
     # angle needs to be the inverse to get the correct result.
-    rotated_quadrilateral = quadrilateral.get_rotated(centroid, -rotation_angle)
+    rotated_quadrilateral = quadrilateral.get_rotated(
+        centroid, -rotation_angle)
     if DEBUG:
         rotated_quadrilateral_preview = get_quadrilateral_preview(
             rotated_image, rotated_quadrilateral, color=64, corner_circle_radius=4, thickness=2)
-        cv.imshow("Rotated Quadrilateral Preview", rotated_quadrilateral_preview)
+        cv.imshow("Rotated Quadrilateral Preview",
+                  rotated_quadrilateral_preview)
 
     # Crop
     crop_points = rotated_quadrilateral.get_crop_points(mode=1)
@@ -167,7 +175,8 @@ def process_single_frame(input_directory_path: str, input_file_name: str) -> Non
     # Segmentation
 
     # Find pores
-    _, threshold_image = cv.threshold(image_cropped, 128, 255, cv.THRESH_BINARY_INV)
+    _, threshold_image = cv.threshold(
+        image_cropped, 128, 255, cv.THRESH_BINARY_INV)
     if DEBUG:
         cv.imshow("Pores Image", threshold_image)
 
@@ -197,29 +206,63 @@ def process_single_frame(input_directory_path: str, input_file_name: str) -> Non
     array_matrix = np.where(res2 > reinforcement_threshold, 1, 0)
 
     # Subtract pores
-    array_reinforcement = np.bitwise_and(np.bitwise_not(array_pores), array_reinforcement)
+    array_reinforcement = np.bitwise_and(
+        np.bitwise_not(array_pores), array_reinforcement)
     array_matrix = np.bitwise_and(np.bitwise_not(array_pores), array_matrix)
 
-    np.savetxt(os.path.join(input_directory_path, "array_pores.csv"), array_pores, fmt="%d", delimiter=",")
-    np.savetxt(os.path.join(input_directory_path, "array_reinforcement.csv"), array_reinforcement, fmt="%d",
+    _, file_base_name, _ = get_file_path_components(input_file_path)
+
+    np.savetxt(os.path.join(output_directory_path, "{}_pores.csv".format(file_base_name)), array_pores, fmt="%d",
                delimiter=",")
-    np.savetxt(os.path.join(input_directory_path, "array_matrix.csv"), array_matrix, fmt="%d", delimiter=",")
-    print("Pores:         {:.6f}".format(get_proportion_for_binary_array(array_pores)))
-    print("Reinforcement: {:.6f}".format(get_proportion_for_binary_array(array_reinforcement)))
-    print("Matrix:        {:.6f}".format(get_proportion_for_binary_array(array_matrix)))
+    np.savetxt(os.path.join(output_directory_path, "{}_reinforcement.csv".format(file_base_name)), array_reinforcement,
+               fmt="%d",
+               delimiter=",")
+    np.savetxt(os.path.join(output_directory_path, "{}_matrix.csv".format(file_base_name)), array_matrix, fmt="%d",
+               delimiter=",")
+    if DEBUG:
+        print("Pores:         {:.6f}".format(
+            get_proportion_for_binary_array(array_pores)))
+        print("Reinforcement: {:.6f}".format(
+            get_proportion_for_binary_array(array_reinforcement)))
+        print("Matrix:        {:.6f}".format(
+            get_proportion_for_binary_array(array_matrix)))
+    
+    return array_pores, array_reinforcement, array_matrix
+
+
+def get_file_path_components(file_path: str) -> Tuple[str, str, str]:
+    directory_path = os.path.dirname(file_path)
+    file_name = os.path.basename(file_path)
+    dot_index = file_name.rindex(".")
+    base_name = file_name[:dot_index]
+    extension = file_name[dot_index + 1:]
+    return directory_path, base_name, extension
 
 
 def main() -> None:
-    input_directory_path = r"Y:\APS\2020-3_1IDC\tomo\32bit\sample_1\hassani_sam1_load0_tomo"
-    if platform == "darwin":
-        input_directory_path = r"/Users/haoyuanxia/Desktop"
-    output_directory_path = r"Y:\APS\2020-3_1IDC\tomo\result\sample_1"
-
+    input_directory_path = os.path.normpath(INPUT_DIRECTORY_PATH)
     input_file_names = [f for f in os.listdir(input_directory_path) if (
-            os.path.isfile(os.path.join(input_directory_path, f)) and f.endswith(".tiff"))]
+        os.path.isfile(os.path.join(input_directory_path, f)) and f.endswith(".tiff"))]
+    input_file_names.sort()
 
-    for input_file_name in input_file_names:
-        process_single_frame(input_directory_path, input_file_name)
+    output_directory_path = os.path.normpath(OUTPUT_DIRECTORY_PATH)
+    if not os.path.exists(output_directory_path):
+        os.makedirs(output_directory_path)
+
+    pores_3d = []
+    reinforcement_3d = []
+    matrix_3d = []
+
+    for index, input_file_name in enumerate(input_file_names):
+        input_file_path = os.path.join(input_directory_path, input_file_name)
+        array_pores, array_reinforcement, array_matrix = process_single_frame(input_file_path, output_directory_path)
+
+        pores_3d.append(array_pores)
+        reinforcement_3d.append(array_reinforcement)
+        matrix_3d.append(array_matrix)
+
+        print("{} ({}/{})".format(input_file_name,
+              index + 1, len(input_file_names)))
 
 
 if __name__ == "__main__":
