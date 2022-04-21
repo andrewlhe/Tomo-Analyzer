@@ -1,9 +1,10 @@
+from contextlib import AsyncExitStack
 import cv2 as cv
-from cv2 import threshold
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 from sys import platform
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 import utilities
 from utilities import DiagonalCorners, Point, Quadrilateral
 
@@ -305,6 +306,34 @@ def get_file_path_components(file_path: str) -> Tuple[str, str, str]:
     return directory_path, base_name, extension
 
 
+def plot_3d(data: List[np.ndarray], title: str, x_label: str, y_label: str, z_label: str, save_file_path: str) -> None:
+    figure = plt.figure()
+    axis = figure.add_subplot(projection="3d")
+
+    axis.set_title(title)
+    axis.set_xlabel(x_label)
+    axis.set_ylabel(y_label)
+    axis.set_zlabel(z_label)
+
+    xs = []
+    ys = []
+    zs = []
+
+    for z in range(len(data)):
+        layer = data[z]
+        for y in range(len(layer)):
+            for x in range(len(layer[y])):
+                if layer[y][x] == 1:
+                    xs.append(x)
+                    ys.append(y)
+                    zs.append(z)
+
+    axis.scatter(xs, ys, zs, s=0.1, linewidths=0)
+
+    figure.savefig(save_file_path, dpi=600)
+    # plt.show()
+
+
 def main() -> None:
     input_directory_path = os.path.normpath(INPUT_DIRECTORY_PATH)
     input_file_names = [f for f in os.listdir(input_directory_path) if (
@@ -336,6 +365,13 @@ def main() -> None:
 
         print("{} ({}/{})".format(input_file_name,
                                   index + 1, len(input_file_names)))
+
+    plot_3d(pores_3d, title="Pores", x_label="X", y_label="Y", z_label="Z",
+            save_file_path=os.path.join(output_directory_path, "pores.png"))
+    plot_3d(reinforcement_3d, title="Reinforcement", x_label="X", y_label="Y", z_label="Z",
+            save_file_path=os.path.join(output_directory_path, "reinforcement.png"))
+    plot_3d(matrix_3d, title="Matrix", x_label="X", y_label="Y", z_label="Z",
+            save_file_path=os.path.join(output_directory_path, "matrix.png"))
 
 
 if __name__ == "__main__":
