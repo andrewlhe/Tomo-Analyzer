@@ -1,6 +1,7 @@
 from contextlib import AsyncExitStack
 import cv2 as cv
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import os
 from sys import platform
@@ -9,8 +10,9 @@ import utilities
 from utilities import DiagonalCorners, Point, Quadrilateral
 
 
-INPUT_DIRECTORY_PATH = r"Y:\APS\2020-3_1IDC\tomo\32bit\sample_1\hassani_sam1_load0_tomo"
-OUTPUT_DIRECTORY_PATH = r"Y:\APS\2020-3_1IDC\tomo\result\sample_1"
+INPUT_DIRECTORY_PATH = r"C:\Users\helew\Desktop\Tomo_debug"
+OUTPUT_DIRECTORY_PATH = r"C:\Users\helew\Desktop\Tomo_debug_results"
+folder_name = "debug"
 if platform == "darwin":
     INPUT_DIRECTORY_PATH = r"/Users/haoyuanxia/Desktop/Input"
     OUTPUT_DIRECTORY_PATH = r"/Users/haoyuanxia/Desktop/Output"
@@ -294,7 +296,7 @@ def process_single_frame(input_file_path: str, output_directory_path: str) -> Tu
     np.savetxt(os.path.join(output_directory_path, "{}_matrix.csv".format(file_base_name)), array_matrix, fmt="%d",
                delimiter=",")
 
-    return array_pores, array_reinforcement, array_matrix, proportion_pores, proportion_reinforcement, proportion_matrix
+    return proportion_pores, proportion_reinforcement, proportion_matrix
 
 
 def get_file_path_components(file_path: str) -> Tuple[str, str, str]:
@@ -334,6 +336,24 @@ def plot_3d(data: List[np.ndarray], title: str, x_label: str, y_label: str, z_la
     # plt.show()
 
 
+def read_plot_volumes(output_directory_path):
+
+    pores_3d = []
+    reinforcement_3d = []
+    matrix_3d = []
+
+    pores_3d.append(array_pores)
+    reinforcement_3d.append(array_reinforcement)
+    matrix_3d.append(array_matrix)
+    
+    plot_3d(pores_3d, title="Pores", x_label="X", y_label="Y", z_label="Z",
+            save_file_path=os.path.join(output_directory_path, "pores.png"))
+    plot_3d(reinforcement_3d, title="Reinforcement", x_label="X", y_label="Y", z_label="Z",
+            save_file_path=os.path.join(output_directory_path, "reinforcement.png"))
+    plot_3d(matrix_3d, title="Matrix", x_label="X", y_label="Y", z_label="Z",
+            save_file_path=os.path.join(output_directory_path, "matrix.png"))
+
+
 def main() -> None:
     input_directory_path = os.path.normpath(INPUT_DIRECTORY_PATH)
     input_file_names = [f for f in os.listdir(input_directory_path) if (
@@ -344,34 +364,42 @@ def main() -> None:
     if not os.path.exists(output_directory_path):
         os.makedirs(output_directory_path)
 
-    pores_3d = []
-    reinforcement_3d = []
-    matrix_3d = []
     proportion_pores_list = []
     proportion_reinforcement_list = []
     proportion_matrix_list = []
+    error_file_list = []
 
     for index, input_file_name in enumerate(input_file_names):
         input_file_path = os.path.join(input_directory_path, input_file_name)
-        array_pores, array_reinforcement, array_matrix, proportion_pores, proportion_reinforcement, proportion_matrix = process_single_frame(
-            input_file_path, output_directory_path)
 
-        pores_3d.append(array_pores)
-        reinforcement_3d.append(array_reinforcement)
-        matrix_3d.append(array_matrix)
-        proportion_pores_list.append(proportion_pores)
-        proportion_reinforcement_list.append(proportion_reinforcement)
-        proportion_matrix_list.append(proportion_matrix)
+        try:
+            proportion_pores, proportion_reinforcement, proportion_matrix = process_single_frame(
+                input_file_path, output_directory_path)
+            
+            proportion_pores_list.append(proportion_pores)
+            proportion_reinforcement_list.append(proportion_reinforcement)
+            proportion_matrix_list.append(proportion_matrix)
+
+        except:
+            error = ["Error in processing ",input_file_name]
+            error_string = "".join(error)
+            print(error_string)
+            error_file_list.append(input_file_name)
+            continue
 
         print("{} ({}/{})".format(input_file_name,
                                   index + 1, len(input_file_names)))
 
-    plot_3d(pores_3d, title="Pores", x_label="X", y_label="Y", z_label="Z",
-            save_file_path=os.path.join(output_directory_path, "pores.png"))
-    plot_3d(reinforcement_3d, title="Reinforcement", x_label="X", y_label="Y", z_label="Z",
-            save_file_path=os.path.join(output_directory_path, "reinforcement.png"))
-    plot_3d(matrix_3d, title="Matrix", x_label="X", y_label="Y", z_label="Z",
-            save_file_path=os.path.join(output_directory_path, "matrix.png"))
+    np.savetxt(os.path.join(output_directory_path, "{}_pores.csv".format(folder_name)), proportion_pores_list, fmt="%.6f",
+               delimiter=",")
+    np.savetxt(os.path.join(output_directory_path, "{}_reinforcement.csv".format(folder_name)), proportion_reinforcement_list,
+               fmt="%.6f", delimiter=",")
+    np.savetxt(os.path.join(output_directory_path, "{}_matrix.csv".format(folder_name)), proportion_matrix_list, fmt="%.6f",
+               delimiter=",")
+    np.savetxt(os.path.join(output_directory_path, "{}_Errors.csv".format(folder_name)), error_file_list, fmt="%.6f",
+               delimiter=",")
+
+
 
 
 if __name__ == "__main__":
