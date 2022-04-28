@@ -12,12 +12,12 @@ from utilities import DiagonalCorners, Point, Quadrilateral
 
 INPUT_DIRECTORY_PATH = r"C:\Users\helew\Desktop\Tomo_debug"
 OUTPUT_DIRECTORY_PATH = r"C:\Users\helew\Desktop\Tomo_debug_results"
-folder_name = "debug"
+DATASET_NAME = "debug"
 if platform == "darwin":
     INPUT_DIRECTORY_PATH = r"/Users/haoyuanxia/Desktop/Input"
     OUTPUT_DIRECTORY_PATH = r"/Users/haoyuanxia/Desktop/Output"
 
-DEBUG = False
+DEBUG = True
 
 
 def get_quadrilateral_preview(image: np.ndarray, quadrilateral: Quadrilateral, color: Union[int, Tuple[int, int, int]],
@@ -199,7 +199,7 @@ def process_single_frame(input_file_path: str, output_directory_path: str) -> Tu
 
     # Find pores
     _, image_pores = cv.threshold(
-        image_cropped, 128, 255, cv.THRESH_BINARY_INV)
+        image_cropped, 120, 255, cv.THRESH_BINARY_INV)
     if DEBUG:
         cv.imshow("Pores", image_pores)
 
@@ -386,13 +386,14 @@ def read_plot_volumes(output_directory_path):
             save_file_path=os.path.join(output_directory_path, "pores.png"))
 
 
-def main() -> None:
-    input_directory_path = os.path.normpath(INPUT_DIRECTORY_PATH)
+def single_folder_processing(single_folder_input, single_folder_output, single_folder_dataset_name) -> None:
+
+    input_directory_path = os.path.normpath(single_folder_input)
     input_file_names = [f for f in os.listdir(input_directory_path) if (
         os.path.isfile(os.path.join(input_directory_path, f)) and f.endswith(".tiff"))]
     input_file_names.sort()
 
-    output_directory_path = os.path.normpath(OUTPUT_DIRECTORY_PATH)
+    output_directory_path = os.path.normpath(single_folder_output)
     if not os.path.exists(output_directory_path):
         os.makedirs(output_directory_path)
 
@@ -422,16 +423,21 @@ def main() -> None:
         print("{} ({}/{})".format(input_file_name,
                                   index + 1, len(input_file_names)))
 
-    np.savetxt(os.path.join(output_directory_path, "{}_pores_proportion.csv".format(folder_name)), proportion_pores_list, fmt="%.6f",
+    np.savetxt(os.path.join(output_directory_path, "{}_pores_proportion.csv".format(single_folder_dataset_name)), proportion_pores_list, fmt="%.6f",
                delimiter=",")
-    np.savetxt(os.path.join(output_directory_path, "{}_reinforcement_proportion.csv".format(folder_name)), proportion_reinforcement_list,
+    np.savetxt(os.path.join(output_directory_path, "{}_reinforcement_proportion.csv".format(single_folder_dataset_name)), proportion_reinforcement_list,
                fmt="%.6f", delimiter=",")
-    np.savetxt(os.path.join(output_directory_path, "{}_matrix_proportion.csv".format(folder_name)), proportion_matrix_list, fmt="%.6f",
+    np.savetxt(os.path.join(output_directory_path, "{}_matrix_proportion.csv".format(single_folder_dataset_name)), proportion_matrix_list, fmt="%.6f",
                delimiter=",")
-    np.savetxt(os.path.join(output_directory_path, "{}_errors.csv".format(folder_name)), error_file_list, fmt='%s',
+    np.savetxt(os.path.join(output_directory_path, "{}_errors.csv".format(single_folder_dataset_name)), error_file_list, fmt='%s',
                delimiter=",")
-    
+
     read_plot_volumes(output_directory_path)
+
+
+def main() -> None:
+
+    single_folder_processing(INPUT_DIRECTORY_PATH, OUTPUT_DIRECTORY_PATH, DATASET_NAME)
 
 
 if __name__ == "__main__":
