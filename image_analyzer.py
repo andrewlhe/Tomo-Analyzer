@@ -17,7 +17,7 @@ if platform == "darwin":
     INPUT_DIRECTORY_PATH = r"/Users/haoyuanxia/Desktop/Input"
     OUTPUT_DIRECTORY_PATH = r"/Users/haoyuanxia/Desktop/Output"
 
-DEBUG = True
+DEBUG = False
 
 
 def get_quadrilateral_preview(image: np.ndarray, quadrilateral: Quadrilateral, color: Union[int, Tuple[int, int, int]],
@@ -100,6 +100,10 @@ def get_rotated(image: np.ndarray, center: Point, angle: float) -> np.ndarray:
 def get_threshold_for_binary_image(image: np.ndarray) -> int:
     # Binary image: an image with only two colors
     return image.min() + (image.max() - image.min()) // 2
+
+
+def get_mean_for_image(image: np.ndarray) -> float:
+    return image.mean()
 
 
 def get_proportion_for_binary_image(image: np.ndarray) -> float:
@@ -200,6 +204,8 @@ def process_single_frame(input_file_path: str, output_directory_path: str) -> Tu
     # Find pores
     _, image_pores = cv.threshold(
         image_cropped, 120, 255, cv.THRESH_BINARY_INV)
+    # _, image_pores = cv.threshold(
+    #     image_cropped, round(get_mean_for_image(image_cropped)), 255, cv.THRESH_BINARY_INV)
     if DEBUG:
         cv.imshow("Pores", image_pores)
 
@@ -288,13 +294,19 @@ def process_single_frame(input_file_path: str, output_directory_path: str) -> Tu
 
     _, file_base_name, _ = get_file_path_components(input_file_path)
 
+    cv.imwrite(os.path.join(output_directory_path,
+               "{}_pores.tiff".format(file_base_name)), image_pores_rotated)
+    cv.imwrite(os.path.join(output_directory_path, "{}_reinforcement.tiff".format(
+        file_base_name)), image_reinforcement_rotated)
+    cv.imwrite(os.path.join(output_directory_path,
+               "{}_matrix.tiff".format(file_base_name)), image_matrix_rotated)
+
     np.savetxt(os.path.join(output_directory_path, "{}_pores.csv".format(file_base_name)), array_pores, fmt="%d",
                delimiter=",")
-    np.savetxt(os.path.join(output_directory_path, "{}_reinforcement.csv".format(file_base_name)), array_reinforcement,
-               fmt="%d",
-               delimiter=",")
-    np.savetxt(os.path.join(output_directory_path, "{}_matrix.csv".format(file_base_name)), array_matrix, fmt="%d",
-               delimiter=",")
+    np.savetxt(os.path.join(output_directory_path, "{}_reinforcement.csv".format(
+        file_base_name)), array_reinforcement, fmt="%d", delimiter=",")
+    np.savetxt(os.path.join(output_directory_path, "{}_matrix.csv".format(
+        file_base_name)), array_matrix, fmt="%d", delimiter=",")
 
     return proportion_pores, proportion_reinforcement, proportion_matrix
 
@@ -437,7 +449,8 @@ def single_folder_processing(single_folder_input, single_folder_output, single_f
 
 def main() -> None:
 
-    single_folder_processing(INPUT_DIRECTORY_PATH, OUTPUT_DIRECTORY_PATH, DATASET_NAME)
+    single_folder_processing(INPUT_DIRECTORY_PATH,
+                             OUTPUT_DIRECTORY_PATH, DATASET_NAME)
 
 
 if __name__ == "__main__":
