@@ -342,16 +342,48 @@ def read_plot_volumes(output_directory_path):
     reinforcement_3d = []
     matrix_3d = []
 
-    pores_3d.append(array_pores)
-    reinforcement_3d.append(array_reinforcement)
-    matrix_3d.append(array_matrix)
-    
-    plot_3d(pores_3d, title="Pores", x_label="X", y_label="Y", z_label="Z",
-            save_file_path=os.path.join(output_directory_path, "pores.png"))
-    plot_3d(reinforcement_3d, title="Reinforcement", x_label="X", y_label="Y", z_label="Z",
-            save_file_path=os.path.join(output_directory_path, "reinforcement.png"))
+    input_file_names_matrix = [f for f in os.listdir(output_directory_path) if (
+        os.path.isfile(os.path.join(output_directory_path, f)) and f.endswith("matrix.csv"))]
+
+    input_file_names_reinforcement = [f for f in os.listdir(output_directory_path) if (
+        os.path.isfile(os.path.join(output_directory_path, f)) and f.endswith("reinforcement.csv"))]
+
+    input_file_names_pores = [f for f in os.listdir(output_directory_path) if (
+        os.path.isfile(os.path.join(output_directory_path, f)) and f.endswith("pores.csv"))]
+
+    input_file_names_matrix.sort()
+    input_file_names_reinforcement.sort()
+    input_file_names_pores.sort()
+
+    for input_file_name in input_file_names_matrix:
+
+        input_file_path = os.path.join(output_directory_path, input_file_name)
+        csv_data = open(input_file_path)
+        matrix_2d = np.loadtxt(csv_data, delimiter=",")
+        matrix_3d.append(matrix_2d)
+
     plot_3d(matrix_3d, title="Matrix", x_label="X", y_label="Y", z_label="Z",
             save_file_path=os.path.join(output_directory_path, "matrix.png"))
+
+    for input_file_name in input_file_names_reinforcement:
+
+        input_file_path = os.path.join(output_directory_path, input_file_name)
+        csv_data = open(input_file_path)
+        reinforcement_2d = np.loadtxt(csv_data, delimiter=",")
+        reinforcement_3d.append(reinforcement_2d)
+
+    plot_3d(reinforcement_3d, title="Reinforcement", x_label="X", y_label="Y", z_label="Z",
+            save_file_path=os.path.join(output_directory_path, "reinforcement.png"))
+
+    for input_file_name in input_file_names_pores:
+
+        input_file_path = os.path.join(output_directory_path, input_file_name)
+        csv_data = open(input_file_path)
+        pores_2d = np.loadtxt(csv_data, delimiter=",")
+        pores_3d.append(pores_2d)
+
+    plot_3d(pores_3d, title="Pores", x_label="X", y_label="Y", z_label="Z",
+            save_file_path=os.path.join(output_directory_path, "pores.png"))
 
 
 def main() -> None:
@@ -375,13 +407,13 @@ def main() -> None:
         try:
             proportion_pores, proportion_reinforcement, proportion_matrix = process_single_frame(
                 input_file_path, output_directory_path)
-            
+
             proportion_pores_list.append(proportion_pores)
             proportion_reinforcement_list.append(proportion_reinforcement)
             proportion_matrix_list.append(proportion_matrix)
 
         except:
-            error = ["Error in processing ",input_file_name]
+            error = ["Error in processing ", input_file_name]
             error_string = "".join(error)
             print(error_string)
             error_file_list.append(input_file_name)
@@ -390,16 +422,16 @@ def main() -> None:
         print("{} ({}/{})".format(input_file_name,
                                   index + 1, len(input_file_names)))
 
-    np.savetxt(os.path.join(output_directory_path, "{}_pores.csv".format(folder_name)), proportion_pores_list, fmt="%.6f",
+    np.savetxt(os.path.join(output_directory_path, "{}_pores_proportion.csv".format(folder_name)), proportion_pores_list, fmt="%.6f",
                delimiter=",")
-    np.savetxt(os.path.join(output_directory_path, "{}_reinforcement.csv".format(folder_name)), proportion_reinforcement_list,
+    np.savetxt(os.path.join(output_directory_path, "{}_reinforcement_proportion.csv".format(folder_name)), proportion_reinforcement_list,
                fmt="%.6f", delimiter=",")
-    np.savetxt(os.path.join(output_directory_path, "{}_matrix.csv".format(folder_name)), proportion_matrix_list, fmt="%.6f",
+    np.savetxt(os.path.join(output_directory_path, "{}_matrix_proportion.csv".format(folder_name)), proportion_matrix_list, fmt="%.6f",
                delimiter=",")
-    np.savetxt(os.path.join(output_directory_path, "{}_Errors.csv".format(folder_name)), error_file_list, fmt="%.6f",
+    np.savetxt(os.path.join(output_directory_path, "{}_errors.csv".format(folder_name)), error_file_list, fmt='%s',
                delimiter=",")
-
-
+    
+    read_plot_volumes(output_directory_path)
 
 
 if __name__ == "__main__":
